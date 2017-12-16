@@ -2,4 +2,8 @@
 
 int startCEF(HWND hWnd);
 
-void doMessageLoop();
+void doMessageLoopWork();
+
+uint32 *getBuffer();
+
+void stopCEF();

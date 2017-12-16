@@ -11,7 +11,7 @@
 #include <include/cef_load_handler.h>
 #include <include/wrapper/cef_helpers.h>
 
-
+uint32 gBuffer[800 * 600 * 4];
 
 class RenderHandler :
 	public CefRenderHandler
@@ -36,12 +36,17 @@ public:
 
 	bool GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect)
 	{
+		//OutputDebugStringW(L"GetViewRect()\n");
 		rect = CefRect(0, 0, width, height);
 		return true;
 	}
 
 	void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList &dirtyRects, const void * buffer, int w, int h)
 	{
+		//OutputDebugStringW(L"OnPaint()\n");
+
+		memcpy(gBuffer, buffer, w * h * 4);
+		
 		/*if (texture)
 		{
 			unsigned char * texture_data = NULL;
@@ -61,8 +66,8 @@ public:
 		}*/
 
 		//texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_UNKNOWN, SDL_TEXTUREACCESS_STREAMING, w, h);
-		width = w;
-		height = h;
+		//width = w;
+		//height = h;
 	}
 
 	void render()
@@ -108,7 +113,9 @@ public:
 	void OnAfterCreated(CefRefPtr<CefBrowser> browser)
 	{
 		// Must be executed on the UI thread.
-		CEF_REQUIRE_UI_THREAD();
+		//CEF_REQUIRE_UI_THREAD();
+
+		OutputDebugStringW(L"OnAfterCreated\n");
 
 		browser_id = browser->GetIdentifier();
 	}
@@ -116,7 +123,7 @@ public:
 	bool DoClose(CefRefPtr<CefBrowser> browser)
 	{
 		// Must be executed on the UI thread.
-		CEF_REQUIRE_UI_THREAD();
+		//CEF_REQUIRE_UI_THREAD();
 
 		// Closing the main window requires special handling. See the DoClose()
 		// documentation in the CEF header for a detailed description of this
@@ -134,28 +141,30 @@ public:
 
 	void OnBeforeClose(CefRefPtr<CefBrowser> browser)
 	{
+		OutputDebugStringW(L"OnBeforeClose()\n");
 	}
 
 	void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode)
 	{
+		OutputDebugStringW(L"OnLoadEnd()\n");
 		std::cout << "OnLoadEnd(" << httpStatusCode << ")" << std::endl;
 		loaded = true;
 	}
 
 	bool OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefLoadHandler::ErrorCode errorCode, const CefString & failedUrl, CefString & errorText)
 	{
-		std::cout << "OnLoadError()" << std::endl;
+		OutputDebugStringW(L"OnLoadError()\n");
 		loaded = true;
 	}
 
 	void OnLoadingStateChange(CefRefPtr<CefBrowser> browser, bool isLoading, bool canGoBack, bool canGoForward)
 	{
-		std::cout << "OnLoadingStateChange()" << std::endl;
+		OutputDebugStringW(L"OnLoadingStateChange()\n");
 	}
 
 	void OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame)
 	{
-		std::cout << "OnLoadStart()" << std::endl;
+		OutputDebugStringW(L"OnLoadStart()\n");
 	}
 
 	bool closeAllowed() const
@@ -183,6 +192,27 @@ CefRefPtr<RenderHandler> renderHandler;
 // create browser-window
 CefRefPtr<CefBrowser> browser;
 CefRefPtr<BrowserClient> browserClient;
+
+
+class MyRequestContextHandler :public CefRequestContextHandler
+{
+public:
+	MyRequestContextHandler() {
+		m_cookieMgr = CefCookieManager::CreateManager("D:/CefCookie", FALSE, nullptr);
+	};
+	~MyRequestContextHandler() {};
+	CefRefPtr<CefCookieManager> GetCookieManager() override {
+		return m_cookieMgr;
+	}
+private:
+	CefRefPtr<CefCookieManager> m_cookieMgr;
+
+	// Include the default reference counting implementation.
+	IMPLEMENT_REFCOUNTING(MyRequestContextHandler);
+};
+
+CefRefPtr<CefRequestContext> rc;
+CefRequestContextSettings reqsettings;
 
 int startCEF(HWND hWnd)
 {
@@ -217,11 +247,13 @@ int startCEF(HWND hWnd)
 
 		// checkout detailed settings options http://magpcss.org/ceforum/apidocs/projects/%28default%29/_cef_settings_t.html
 		// nearly all the settings can be set via args too.
-		// settings.multi_threaded_message_loop = true; // not supported, except windows
+		settings.multi_threaded_message_loop = true; // not supported, except windows
+		//settings.single_process = true; // not supported, except windows
+		//settings.remote_debugging_port = 8090;
 		// CefString(&settings.browser_subprocess_path).FromASCII("sub_proccess path, by default uses and starts this executeable as child");
 		// CefString(&settings.cache_path).FromASCII("");
 		// CefString(&settings.log_file).FromASCII("");
-		// settings.log_severity = LOGSEVERITY_DEFAULT;
+		//settings.log_severity = LOGSEVERITY_DEFAULT;
 
 		bool result = CefInitialize(args, settings, nullptr, nullptr);
 		// CefInitialize creates a sub-proccess and executes the same executeable, as calling CefInitialize, if not set different in settings.browser_subprocess_path
@@ -231,17 +263,15 @@ int startCEF(HWND hWnd)
 			// handle error
 			return -1;
 		}
-	}
-
-	
+	}	
 
 	int width = 800;
 	int height = 600;
 
-
 	renderHandler = new RenderHandler(width, height);
 
 	// create browser-window
+	bool ret = false;
 	{
 		CefWindowInfo window_info;
 		CefBrowserSettings browserSettings;
@@ -252,7 +282,10 @@ int startCEF(HWND hWnd)
 
 		browserClient = new BrowserClient(renderHandler);
 
-		browser = CefBrowserHost::CreateBrowserSync(window_info, browserClient.get(), "http://www.google.com", browserSettings, nullptr);
+		//browser = CefBrowserHost::CreateBrowserSync(window_info, browserClient.get(), "http://magpcss.org/ceforum/apidocs/projects/%28default%29/_cef_settings_t.html", browserSettings, nullptr);
+
+		rc = CefRequestContext::CreateContext(reqsettings, new MyRequestContextHandler());
+		ret = CefBrowserHost::CreateBrowser(window_info, browserClient.get(), "https://www.youtube.com/watch?v=ncp86cs3j8s", browserSettings, rc);
 
 		// inject user-input by calling - non-trivial for non-windows - checkout the cefclient source and the platform specific cpp, like cefclient_osr_widget_gtk.cpp for linux
 		// browser->GetHost()->SendKeyEvent(...);
@@ -264,7 +297,20 @@ int startCEF(HWND hWnd)
 	return 0;
 }
 
-void doMessageLoop()
+void doMessageLoopWork()
 {
 	CefDoMessageLoopWork();
+}
+
+uint32 *getBuffer()
+{
+	return gBuffer;
+}
+
+void stopCEF()
+{
+	//browser = nullptr;
+	browserClient = nullptr;
+	renderHandler = nullptr;
+	CefShutdown();
 }

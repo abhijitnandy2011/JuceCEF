@@ -2435,6 +2435,7 @@
     <ClInclude Include="..\..\JuceLibraryCode\AppConfig.h" />
     <ClInclude Include="..\..\JuceLibraryCode\JuceHeader.h" />
     <ClInclude Include="..\..\Source\cef.h" />
+    <ClInclude Include="..\..\Source\MainComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\JUCE-master\modules\juce_audio_formats\codecs\flac\Flac Licence.txt" />

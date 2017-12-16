@@ -3764,6 +3764,9 @@
     <ClInclude Include="..\..\Source\cef.h">
       <Filter>glcef\Source</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\MainComponent.h">
+      <Filter>glcef\Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\JUCE-master\modules\juce_audio_formats\codecs\flac\Flac Licence.txt">
